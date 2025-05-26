@@ -59,3 +59,430 @@
 - **چه زمانی باید این بوی بد را نادیده گرفت؟**
 
 اگر جابجایی متد باعث به هم خوردن نظم مسئولیت‌ها یا منطق کلی برنامه شود، انجام این بازآرایی پیشنهاد نمی‌شود، اما در مواردی که دسترسی متد به داده‌های کلاس دیگر بر اساس نیاز واقعی طراحی برنامه باشد، این وضعیت قابل قبول است. در چنین شرایطی، حذف این بو ممکن است مشکلات جدید ایجاد کند یا باعث به‌هم‌ریختگی بیشتر ساختار گردد، در نتیجه، وجود Feature Envy همیشه به معنای نیاز قطعی به بازآرایی نیست و باید با توجه به شرایط خاص پروژه تصمیم‌گیری شود.
+
+---
+
+# بازآرایی ها
+
+## بازآرایی ۱: جایگزینی اعداد جادویی با ثابت‌های نامگذاری‌شده
+
+### توضیح:
+
+وجود اعداد جادویی در کد باعث کاهش خوانایی و نگهداری‌پذیری می‌شود. با استخراج این اعداد به صورت ثابت‌های نامگذاری‌شده، خودمستندسازی کد بهبود می‌یابد و اعمال تغییرات آینده ساده‌تر می‌شود. این بازآرایی به حذف بوی کد “عدد جادویی” کمک می‌کند و اصل DRY را رعایت می‌کند.
+
+### پیاده‌سازی:
+
+در فایل:
+
+```
+java:src/main/java/MiniJava/codeGenerator/MemoryConstants.java
+```
+
+کلاس جدیدی به نام MemoryConstants اضافه شده است:
+
+```Java
+package MiniJava.codeGenerator;
+
+/**
+ * ثابت‌ها برای مدیریت حافظه در تولید کد
+ */
+public final class MemoryConstants {
+    // ثابت‌های مربوط به چینش حافظه
+    public static final int TEMP_MEMORY_START_ADDRESS = 500;
+    public static final int DATA_MEMORY_START_ADDRESS = 200;
+    public static final int WORD_SIZE = 4;
+
+    // مقادیر پیش‌فرض تخصیص حافظه
+    public static final int DEFAULT_TEMP_SIZE = 4;
+    public static final int DEFAULT_DATA_SIZE = 4;
+
+    // جلوگیری از ایجاد نمونه از کلاس
+    private MemoryConstants() {
+        throw new AssertionError("Utility class should not be instantiated");
+    }
+}
+
+```
+
+و در فایل:
+
+```
+java:src/main/java/MiniJava/codeGenerator/Memory.java
+```
+
+به جای اعداد جادویی، از ثابت‌های تعریف‌شده استفاده شده است:
+
+```Java
+package MiniJava.codeGenerator;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+
+public class Memory {
+    private ArrayList<_3AddressCode> codeBlock;
+    private int lastTempIndex;
+    private int lastDataIndex;
+
+    // استفاده از ثابت‌های نامگذاری‌شده به جای اعداد جادویی
+    private final int startTempMemoryAddress = MemoryConstants.TEMP_MEMORY_START_ADDRESS;
+    private final int startDataMemoryAddress = MemoryConstants.DATA_MEMORY_START_ADDRESS;
+    private final int tempSize = MemoryConstants.DEFAULT_TEMP_SIZE;
+    private final int dataSize = MemoryConstants.DEFAULT_DATA_SIZE;
+
+    public Memory() {
+        codeBlock = new ArrayList<>();
+        lastTempIndex = startTempMemoryAddress;
+        lastDataIndex = startDataMemoryAddress;
+    }
+
+    public int getTemp() {
+        lastTempIndex += MemoryConstants.WORD_SIZE;
+        return lastTempIndex - MemoryConstants.WORD_SIZE;
+    }
+
+    public int getDateAddress() {
+        lastDataIndex += MemoryConstants.WORD_SIZE;
+        return lastDataIndex - MemoryConstants.WORD_SIZE;
+    }
+
+}
+
+```
+
+---
+
+## بازآرایی ۲: زمینه خود-کپسوله (Self-Encapsulated Field)
+
+### توضیح:
+
+کلاس \_3AddressCode در ابتدا تمام فیلدهای خود را به صورت عمومی در دسترس قرار می‌داد که این موضوع با اصول کپسوله‌سازی مغایرت دارد. با خصوصی کردن فیلدها و ایجاد متدهای getter و setter، از وضعیت داخلی شیء محافظت می‌شود و امکان اضافه کردن اعتبارسنجی یا منطق تجاری در آینده بدون تغییر کد کاربر فراهم می‌گردد.
+
+### پیاده‌سازی:
+
+در فایل:
+
+```
+java:src/main/java/MiniJava/codeGenerator/_3AddressCode.java
+```
+
+ساختار کلاس به صورت زیر تغییر داده شده است:
+
+```Java
+package MiniJava.codeGenerator;
+
+public class _3AddressCode {
+    private Operation operation;
+    private Address operand1;
+    private Address operand2;
+    private Address operand3;
+
+    public _3AddressCode() {
+    }
+
+    public _3AddressCode(Operation operation, Address operand1, Address operand2, Address operand3) {
+        this.operation = operation;
+        this.operand1 = operand1;
+        this.operand2 = operand2;
+        this.operand3 = operand3;
+    }
+
+    // متدهای دسترسی (getter)
+    public Operation getOperation() {
+        return operation;
+    }
+
+    public Address getOperand1() {
+        return operand1;
+    }
+
+    public Address getOperand2() {
+        return operand2;
+    }
+
+    public Address getOperand3() {
+        return operand3;
+    }
+
+    // متدهای تنظیم مقدار (setter)
+    public void setOperation(Operation operation) {
+        this.operation = operation;
+    }
+
+    public void setOperand1(Address operand1) {
+        this.operand1 = operand1;
+    }
+
+    public void setOperand2(Address operand2) {
+        this.operand2 = operand2;
+    }
+
+    public void setOperand3(Address operand3) {
+        this.operand3 = operand3;
+    }
+
+    @Override
+    public String toString() {
+        if (operation == null) return "";
+
+        switch (operation) {
+            case ADD:
+            case SUB:
+            case MULT:
+                return String.format("(%s,%s,%s,%s)", operation, operand1, operand2, operand3);
+            case ASSIGN:
+                return String.format("(%s,%s,,,%s)", operation, operand1, operand3);
+            case EQ:
+            case LT:
+                return String.format("(%s,%s,%s,%s)", operation, operand1, operand2, operand3);
+            case JPF:
+            case JP:
+                return String.format("(%s,%s,,)", operation, operand1);
+            case PRINT:
+                return String.format("(%s,%s,,)", operation, operand1);
+            default:
+                return "";
+        }
+    }
+}
+
+```
+
+همچنین در کلاس Memory جهت ایجاد نمونه‌های جدید از متدهای سازنده جدید استفاده شده است:
+
+```
+java:src/main/java/MiniJava/codeGenerator/Memory.java
+```
+
+```Java
+
+public void add3AddressCode(Operation op, Address operand1, Address operand2, Address operand3) {
+    _3AddressCode code = new _3AddressCode(op, operand1, operand2, operand3);
+    codeBlock.add(code);
+}
+
+public void add3AddressCode(Operation op, Address operand1, Address operand3) {
+    _3AddressCode code = new _3AddressCode(op, operand1, null, operand3);
+    codeBlock.add(code);
+}
+
+public void add3AddressCode(Operation op, Address operand1) {
+    _3AddressCode code = new _3AddressCode(op, operand1, null, null);
+    codeBlock.add(code);
+}
+
+public void add3AddressCode(int i, Operation op, Address operand1, Address operand2, Address operand3) {
+    _3AddressCode code = new _3AddressCode(op, operand1, operand2, operand3);
+    codeBlock.set(i, code);
+}
+
+// ... بقیه متدها بدون تغییر ...
+
+```
+
+---
+
+## بازآرایی ۳: استخراج متد (Extract Method)
+
+### توضیح:
+
+در کلاس CodeGenerator الگوهای تکراری برای عملیات‌های جبری مانند add()، sub() و mult() وجود داشت. با استخراج منطق مشترک به متدهای قابل استفاده‌ی مجدد، تکرار کد کاهش یافته، نگهداری آسان‌تر شده و خوانایی با بیان مستقیم هدف هر متد، بهبود می‌یابد.
+
+### پیاده‌سازی:
+
+در فایل:
+
+```
+java:src/main/java/MiniJava/codeGenerator/CodeGenerator.java
+```
+
+الگوهای تکراری در متدهای جمع، تفریق و ضرب و همچنین مقایسه‌ها به متد عمومی تبدیل شدند:
+
+```Java
+public class CodeGenerator {
+
+    /**
+     * اعتبارسنجی صحیح بودن نوع متغیرها برای عملیات جبری
+     */
+    private void validateIntegerOperands(Address operand1, Address operand2, String operationName) {
+        if (operand1.getVarType() != varType.Int || operand2.getVarType() != varType.Int) {
+            ErrorHandler.printError("Type mismatch in " + operationName + " operation");
+        }
+    }
+
+    /**
+     * انجام یک عملیات جبری دوتایی و اضافه کردن نتیجه به پشته معنایی
+     */
+    private void performBinaryArithmeticOperation(Operation operation, String operationName) {
+        Address secondOperand = ss.pop();
+        Address firstOperand = ss.pop();
+
+        validateIntegerOperands(firstOperand, secondOperand, operationName);
+
+        Address tempResult = new Address(memory.getTemp(), varType.Int);
+        memory.add3AddressCode(operation, firstOperand, secondOperand, tempResult);
+        ss.push(tempResult);
+    }
+
+    /**
+     * انجام یک عملیات مقایسه دوتایی و اضافه کردن نتیجه به پشته معنایی
+     */
+    private void performBinaryComparisonOperation(Operation operation, String operationName) {
+        Address secondOperand = ss.pop();
+        Address firstOperand = ss.pop();
+
+        validateIntegerOperands(firstOperand, secondOperand, operationName);
+
+        Address tempResult = new Address(memory.getTemp(), varType.Bool);
+        memory.add3AddressCode(operation, firstOperand, secondOperand, tempResult);
+        ss.push(tempResult);
+    }
+
+    // متدهای بازآرایی‌شده
+    public void add() {
+        performBinaryArithmeticOperation(Operation.ADD, "addition");
+    }
+
+    public void sub() {
+        performBinaryArithmeticOperation(Operation.SUB, "subtraction");
+    }
+
+    public void mult() {
+        performBinaryArithmeticOperation(Operation.MULT, "multiplication");
+    }
+
+    public void lessThan() {
+        performBinaryComparisonOperation(Operation.LT, "less than comparison");
+    }
+
+    public void equal() {
+        performBinaryComparisonOperation(Operation.EQ, "equality comparison");
+    }
+
+}
+
+```
+
+---
+
+## بازآرایی ۴: جدا کردن پرس‌وجو از تغییر‌دهنده (Separate Query from Modifier)
+
+### توضیح:
+
+متد saveMemory() همزمان هم وضعیت کد را تغییر می‌داد (با اضافه کردن به codeBlock) و هم یک مقدار (آدرس) برمی‌گرداند. این موضوع اصل «جدا کردن فرمان از پرس‌وجو» (Command-Query Separation) را نقض می‌کند. با جداسازی این موارد، کد قابل پیش‌بینی‌تر، تست‌پذیرتر و بدون عوارض جانبی در متدهای پرس‌وجو خواهد شد.
+
+### پیاده‌سازی:
+
+در فایل:
+
+```
+java:src/main/java/MiniJava/codeGenerator/Memory.java
+```
+
+دو متد مجزا جایگزین متد ترکیبی شده‌اند:
+
+```Java
+/**
+ * پرس‌وجو: بازگرداندن شماره فعلی دستور کد بدون تغییر وضعیت
+ */
+public int getCurrentCodeAddress() {
+    return codeBlock.size();
+}
+
+/**
+ * تغییر‌دهنده: رزرو یک اسلات کد برای استفاده‌ی آینده
+ */
+public void reserveCodeSlot() {
+    codeBlock.add(new _3AddressCode());
+}
+
+/**
+ * @deprecated استفاده از getCurrentCodeAddress() سپس reserveCodeSlot() به جای این متد توصیه می‌شود
+ */
+@Deprecated
+public int saveMemory() {
+    int currentAddress = getCurrentCodeAddress();
+    reserveCodeSlot();
+    return currentAddress;
+}
+```
+
+---
+
+## بازآرایی ۵: الگوی نما (Facade Pattern) برای عملیات پشته‌ها
+
+### توضیح:
+
+کلاس CodeGenerator مستقیماً سه پشته مختلف را مدیریت می‌کرد که باعث درهم‌تنیدگی (Tight Coupling) و افزایش پیچیدگی می‌شد. استفاده از الگوی نما (Facade) این عملیات را ساده‌تر می‌کند؛ بدین صورت که متدهای سطح بالا برای مدیریت پشته‌ها ارائه می‌دهد، همانند یک نقطه ورود واحد برای وظایف مرتبط و هماهنگ‌سازی آن‌ها. این کار باعث کاهش پیچیدگی و بهبود سازماندهی کد می‌شود.
+
+### پیاده‌سازی:
+
+در فایل:
+
+```
+java:src/main/java/MiniJava/codeGenerator/SemanticStackFacade.java
+```
+
+کلاسی با متدهای سطح بالا برای مدیریت و هماهنگ‌سازی پشته‌های مختلف پیاده‌سازی شده است:
+
+```Java
+public class SemanticStackFacade {
+    private Stack<Address> semanticStack;
+    private Stack<String> symbolStack;
+    private Stack<String> callStack;
+
+
+    // عملیات سطح بالا
+    public void pushMethodContext(String className, String methodName) {
+        pushSymbol(className);
+        pushSymbol(methodName);
+    }
+
+    public MethodContext popMethodContext() {
+        String methodName = popSymbol();
+        String className = popSymbol();
+        return new MethodContext(className, methodName);
+    }
+
+    public BinaryOperationContext popBinaryOperation() {
+        Address secondOperand = popAddress();
+        Address firstOperand = popAddress();
+        return new BinaryOperationContext(firstOperand, secondOperand);
+    }
+
+    // کلاس‌های کمکی برای مدیریت عملیات‌های هماهنگ
+    public static class MethodContext { /* ... */ }
+    public static class BinaryOperationContext { /* ... */ }
+}
+
+```
+
+در فایل:
+
+```
+java:src/main/java/MiniJava/codeGenerator/CodeGenerator.java
+```
+
+تمام عملیات مرتبط با پشته‌ها به متدهای کلاس نما (Facade) منتقل شده‌اند تا وابستگی به جزئیاتِ مدیریت پشته‌ها کاهش یابد:
+
+```Java
+public class CodeGenerator {
+    private SemanticStackFacade stackFacade;
+
+    public CodeGenerator() {
+        this.stackFacade = new SemanticStackFacade();
+    }
+
+    // نمونه استفاده:
+    private void performBinaryArithmeticOperation(Operation operation, String operationName) {
+        SemanticStackFacade.BinaryOperationContext context = stackFacade.popBinaryOperation();
+        validateIntegerOperands(context.getFirstOperand(), context.getSecondOperand(), operationName);
+        Address tempResult = new Address(memory.getTemp(), varType.Int);
+        memory.add3AddressCode(operation, context.getFirstOperand(), context.getSecondOperand(), tempResult);
+        stackFacade.pushAddress(tempResult);
+    }
+
+    // سایر متدها مشابه بالا با استفاده از stackFacade بازنویسی شده‌اند
+}
+
+```
