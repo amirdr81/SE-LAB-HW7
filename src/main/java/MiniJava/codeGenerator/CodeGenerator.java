@@ -113,7 +113,8 @@ public class CodeGenerator {
                 save();
                 break;
             case 15:
-                _while();
+//                _while();
+                whileLabel();
                 break;
             case 16:
                 jpf_save();
@@ -395,15 +396,35 @@ public class CodeGenerator {
         memory.add3AddressCode(Operation.JP, ss.pop(), null, null);
     }
 
+    // Update usage in CodeGenerator
+    public void whileLabel() {
+        callStack.push(String.valueOf(getCurrentCodeAddress()));
+    }
+
     public void jpf_save() {
-        Address save = new Address(memory.saveMemory(), varType.Address);
-        memory.add3AddressCode(ss.pop().num, Operation.JPF, ss.pop(), new Address(memory.getCurrentCodeBlockAddress(), varType.Address), null);
-        ss.push(save);
+        Address save = ss.pop();
+        int currentAddress = memory.getCurrentCodeAddress();
+        memory.reserveCodeSlot();
+        memory.add3AddressCode(Operation.JPF, save, new Address(currentAddress, varType.Address));
+        callStack.push(String.valueOf(currentAddress));
     }
 
     public void jpHere() {
-        memory.add3AddressCode(ss.pop().num, Operation.JP, new Address(memory.getCurrentCodeBlockAddress(), varType.Address), null, null);
+        int currentAddress = memory.getCurrentCodeAddress();
+        memory.reserveCodeSlot();
+        callStack.push(String.valueOf(currentAddress));
     }
+
+
+//    public void jpf_save() {
+//        Address save = new Address(memory.saveMemory(), varType.Address);
+//        memory.add3AddressCode(ss.pop().num, Operation.JPF, ss.pop(), new Address(memory.getCurrentCodeBlockAddress(), varType.Address), null);
+//        ss.push(save);
+//    }
+
+//    public void jpHere() {
+//        memory.add3AddressCode(ss.pop().num, Operation.JP, new Address(memory.getCurrentCodeBlockAddress(), varType.Address), null, null);
+//    }
 
     public void print() {
         memory.add3AddressCode(Operation.PRINT, ss.pop(), null, null);

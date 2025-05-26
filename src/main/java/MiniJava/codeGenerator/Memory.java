@@ -33,10 +33,10 @@ public class Memory {
         return lastDataIndex - MemoryConstants.WORD_SIZE;
     }
 
-    public int saveMemory() {
-        codeBlock.add(new _3AddressCode());
-        return codeBlock.size() - 1;
-    }
+//    public int saveMemory() {
+//        codeBlock.add(new _3AddressCode());
+//        return codeBlock.size() - 1;
+//    }
 
     public void add3AddressCode(Operation op, Address operand1, Address operand2, Address operand3) {
         _3AddressCode code = new _3AddressCode(op, operand1, operand2, operand3);
@@ -56,6 +56,27 @@ public class Memory {
     public void add3AddressCode(int i, Operation op, Address operand1, Address operand2, Address operand3) {
         _3AddressCode code = new _3AddressCode(op, operand1, operand2, operand3);
         codeBlock.set(i, code);
+    }
+
+    public int getCurrentCodeAddress() {
+        return codeBlock.size();
+    }
+
+    /**
+     * Modifier: Reserves a code slot for future use
+     */
+    public void reserveCodeSlot() {
+        codeBlock.add(new _3AddressCode());
+    }
+
+    /**
+     * @deprecated Use getCurrentCodeAddress() followed by reserveCodeSlot() instead
+     */
+    @Deprecated
+    public int saveMemory() {
+        int currentAddress = getCurrentCodeAddress();
+        reserveCodeSlot();
+        return currentAddress;
     }
 
     public int getCurrentCodeBlockAddress() {
