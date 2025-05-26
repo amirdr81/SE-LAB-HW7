@@ -820,7 +820,7 @@ public class AssignAction implements SemanticAction {
 - **در نهایت، در گام آخر، در فایل CodeGenerator.java، نیاز است تا متد هایی که مشمول تغییر شده اند را در این بخش نیز تغییر دهیم. توجه داشته باشید که در گام اول، همان متد semanticFunction را باید تغییر دهیم که تمام عملیات به خاطر طولانی بودن آن بوده است. توابع دیگری همچون checkID، pid و add نیز تغییر جزئی خواهند داشت:**
 
 ```
-
+java:src/main/java/MiniJava/codeGenerator/CodeGenerator.java
 ```
 
 ```Java
