@@ -24,6 +24,43 @@ public class CodeGenerator {
         //TODO
     }
 
+    /**
+     * Validates that both operands are integers for arithmetic operations
+     */
+    private void validateIntegerOperands(Address operand1, Address operand2, String operationName) {
+        if (operand1.getVarType() != varType.Int || operand2.getVarType() != varType.Int) {
+            ErrorHandler.printError("Type mismatch in " + operationName + " operation");
+        }
+    }
+
+    /**
+     * Performs a binary arithmetic operation and pushes result to semantic stack
+     */
+    private void performBinaryArithmeticOperation(Operation operation, String operationName) {
+        Address secondOperand = ss.pop();
+        Address firstOperand = ss.pop();
+
+        validateIntegerOperands(firstOperand, secondOperand, operationName);
+
+        Address tempResult = new Address(memory.getTemp(), varType.Int);
+        memory.add3AddressCode(operation, firstOperand, secondOperand, tempResult);
+        ss.push(tempResult);
+    }
+
+    /**
+     * Performs a binary comparison operation and pushes result to semantic stack
+     */
+    private void performBinaryComparisonOperation(Operation operation, String operationName) {
+        Address secondOperand = ss.pop();
+        Address firstOperand = ss.pop();
+
+        validateIntegerOperands(firstOperand, secondOperand, operationName);
+
+        Address tempResult = new Address(memory.getTemp(), varType.Bool);
+        memory.add3AddressCode(operation, firstOperand, secondOperand, tempResult);
+        ss.push(tempResult);
+    }
+
     public void printMemory() {
         memory.pintCodeBlock();
     }
@@ -298,39 +335,51 @@ public class CodeGenerator {
         memory.add3AddressCode(Operation.ASSIGN, s1, s2, null);
     }
 
-    public void add() {
-        Address temp = new Address(memory.getTemp(), varType.Int);
-        Address s2 = ss.pop();
-        Address s1 = ss.pop();
+//    public void add() {
+//        Address temp = new Address(memory.getTemp(), varType.Int);
+//        Address s2 = ss.pop();
+//        Address s1 = ss.pop();
+//
+//        if (s1.varType != varType.Int || s2.varType != varType.Int) {
+//            ErrorHandler.printError("In add two operands must be integer");
+//        }
+//        memory.add3AddressCode(Operation.ADD, s1, s2, temp);
+//        ss.push(temp);
+//    }
 
-        if (s1.varType != varType.Int || s2.varType != varType.Int) {
-            ErrorHandler.printError("In add two operands must be integer");
-        }
-        memory.add3AddressCode(Operation.ADD, s1, s2, temp);
-        ss.push(temp);
+//    public void sub() {
+//        Address temp = new Address(memory.getTemp(), varType.Int);
+//        Address s2 = ss.pop();
+//        Address s1 = ss.pop();
+//        if (s1.varType != varType.Int || s2.varType != varType.Int) {
+//            ErrorHandler.printError("In sub two operands must be integer");
+//        }
+//        memory.add3AddressCode(Operation.SUB, s1, s2, temp);
+//        ss.push(temp);
+//    }
+
+//    public void mult() {
+//        Address temp = new Address(memory.getTemp(), varType.Int);
+//        Address s2 = ss.pop();
+//        Address s1 = ss.pop();
+//        if (s1.varType != varType.Int || s2.varType != varType.Int) {
+//            ErrorHandler.printError("In mult two operands must be integer");
+//        }
+//        memory.add3AddressCode(Operation.MULT, s1, s2, temp);
+////        memory.saveMemory();
+//        ss.push(temp);
+//    }
+    // Refactored arithmetic methods
+    public void add() {
+        performBinaryArithmeticOperation(Operation.ADD, "addition");
     }
 
     public void sub() {
-        Address temp = new Address(memory.getTemp(), varType.Int);
-        Address s2 = ss.pop();
-        Address s1 = ss.pop();
-        if (s1.varType != varType.Int || s2.varType != varType.Int) {
-            ErrorHandler.printError("In sub two operands must be integer");
-        }
-        memory.add3AddressCode(Operation.SUB, s1, s2, temp);
-        ss.push(temp);
+        performBinaryArithmeticOperation(Operation.SUB, "subtraction");
     }
 
     public void mult() {
-        Address temp = new Address(memory.getTemp(), varType.Int);
-        Address s2 = ss.pop();
-        Address s1 = ss.pop();
-        if (s1.varType != varType.Int || s2.varType != varType.Int) {
-            ErrorHandler.printError("In mult two operands must be integer");
-        }
-        memory.add3AddressCode(Operation.MULT, s1, s2, temp);
-//        memory.saveMemory();
-        ss.push(temp);
+        performBinaryArithmeticOperation(Operation.MULT, "multiplication");
     }
 
     public void label() {
@@ -360,26 +409,34 @@ public class CodeGenerator {
         memory.add3AddressCode(Operation.PRINT, ss.pop(), null, null);
     }
 
-    public void equal() {
-        Address temp = new Address(memory.getTemp(), varType.Bool);
-        Address s2 = ss.pop();
-        Address s1 = ss.pop();
-        if (s1.varType != s2.varType) {
-            ErrorHandler.printError("The type of operands in equal operator is different");
-        }
-        memory.add3AddressCode(Operation.EQ, s1, s2, temp);
-        ss.push(temp);
+//    public void equal() {
+//        Address temp = new Address(memory.getTemp(), varType.Bool);
+//        Address s2 = ss.pop();
+//        Address s1 = ss.pop();
+//        if (s1.varType != s2.varType) {
+//            ErrorHandler.printError("The type of operands in equal operator is different");
+//        }
+//        memory.add3AddressCode(Operation.EQ, s1, s2, temp);
+//        ss.push(temp);
+//    }
+//
+//    public void less_than() {
+//        Address temp = new Address(memory.getTemp(), varType.Bool);
+//        Address s2 = ss.pop();
+//        Address s1 = ss.pop();
+//        if (s1.varType != varType.Int || s2.varType != varType.Int) {
+//            ErrorHandler.printError("The type of operands in less than operator is different");
+//        }
+//        memory.add3AddressCode(Operation.LT, s1, s2, temp);
+//        ss.push(temp);
+//    }
+    // Refactored comparison methods
+    public void lessThan() {
+        performBinaryComparisonOperation(Operation.LT, "less than comparison");
     }
 
-    public void less_than() {
-        Address temp = new Address(memory.getTemp(), varType.Bool);
-        Address s2 = ss.pop();
-        Address s1 = ss.pop();
-        if (s1.varType != varType.Int || s2.varType != varType.Int) {
-            ErrorHandler.printError("The type of operands in less than operator is different");
-        }
-        memory.add3AddressCode(Operation.LT, s1, s2, temp);
-        ss.push(temp);
+    public void equal() {
+        performBinaryComparisonOperation(Operation.EQ, "equality comparison");
     }
 
     public void and() {
