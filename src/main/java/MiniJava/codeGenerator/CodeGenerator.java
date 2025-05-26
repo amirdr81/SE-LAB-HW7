@@ -588,7 +588,6 @@
 //    }
 //}
 
-
 package MiniJava.codeGenerator;
 
 import MiniJava.Log.Log;
@@ -605,13 +604,14 @@ import java.util.Scanner;
  */
 public class CodeGenerator {
     private SemanticStackFacade stackFacade;
-    private Memory memory;
+    private CodeGenerationFacade codeFacade;
     private Scanner scanner;
     private SymbolTable symbolTable;
 
     public CodeGenerator() {
         this.stackFacade = new SemanticStackFacade();
-        this.memory = new Memory();
+        Memory memory = new Memory();
+        this.codeFacade = new CodeGenerationFacade(memory);
         this.scanner = new Scanner(System.in);
         this.symbolTable = new SymbolTable(memory);
     }
@@ -633,9 +633,10 @@ public class CodeGenerator {
 
         validateIntegerOperands(context.getFirstOperand(), context.getSecondOperand(), operationName);
 
-        Address tempResult = new Address(memory.getTemp(), varType.Int);
-        memory.add3AddressCode(operation, context.getFirstOperand(), context.getSecondOperand(), tempResult);
-        stackFacade.pushAddress(tempResult);
+        Address result = codeFacade.generateArithmeticOperation(operation,
+                context.getFirstOperand(),
+                context.getSecondOperand());
+        stackFacade.pushAddress(result);
     }
 
     /**
@@ -646,9 +647,10 @@ public class CodeGenerator {
 
         validateIntegerOperands(context.getFirstOperand(), context.getSecondOperand(), operationName);
 
-        Address tempResult = new Address(memory.getTemp(), varType.Bool);
-        memory.add3AddressCode(operation, context.getFirstOperand(), context.getSecondOperand(), tempResult);
-        stackFacade.pushAddress(tempResult);
+        Address result = codeFacade.generateComparisonOperation(operation,
+                context.getFirstOperand(),
+                context.getSecondOperand());
+        stackFacade.pushAddress(result);
     }
 
     public void printMemory() {
@@ -763,7 +765,8 @@ public class CodeGenerator {
     }
 
     private void defMain() {
-        memory.add3AddressCode(stackFacade.popAddress().num, Operation.JP, new Address(memory.getCurrentCodeAddress(), varType.Address), null, null);
+        memory.add3AddressCode(stackFacade.popAddress().num, Operation.JP,
+                new Address(memory.getCurrentCodeAddress(), varType.Address), null, null);
         String methodName = "main";
         String className = stackFacade.popSymbol();
 
@@ -776,7 +779,7 @@ public class CodeGenerator {
     public void checkID() {
         stackFacade.popSymbol();
         if (stackFacade.peekAddress().getVarType() == varType.Non) {
-            //TODO : error
+            // TODO : error
         }
     }
 
@@ -842,9 +845,13 @@ public class CodeGenerator {
         }
         Address temp = new Address(memory.getTemp(), t);
         stackFacade.pushAddress(temp);
-        memory.add3AddressCode(Operation.ASSIGN, new Address(temp.num, varType.Address, TypeAddress.Imidiate), new Address(symbolTable.getMethodReturnAddress(className, methodName), varType.Address), null);
-        memory.add3AddressCode(Operation.ASSIGN, new Address(memory.getCurrentCodeAddress() + 2, varType.Address, TypeAddress.Imidiate), new Address(symbolTable.getMethodCallerAddress(className, methodName), varType.Address), null);
-        memory.add3AddressCode(Operation.JP, new Address(symbolTable.getMethodAddress(className, methodName), varType.Address), null, null);
+        memory.add3AddressCode(Operation.ASSIGN, new Address(temp.num, varType.Address, TypeAddress.Imidiate),
+                new Address(symbolTable.getMethodReturnAddress(className, methodName), varType.Address), null);
+        memory.add3AddressCode(Operation.ASSIGN,
+                new Address(memory.getCurrentCodeAddress() + 2, varType.Address, TypeAddress.Imidiate),
+                new Address(symbolTable.getMethodCallerAddress(className, methodName), varType.Address), null);
+        memory.add3AddressCode(Operation.JP,
+                new Address(symbolTable.getMethodAddress(className, methodName), varType.Address), null, null);
     }
 
     public void arg() {
@@ -873,13 +880,15 @@ public class CodeGenerator {
     }
 
     public void assign() {
-        Address s1 = stackFacade.popAddress();
-        Address s2 = stackFacade.popAddress();
+        Address source = stackFacade.popAddress();
+        Address destination = stackFacade.popAddress();
+
         // Type checking
-        if (s1.getVarType() != s2.getVarType()) {
+        if (source.getVarType() != destination.getVarType()) {
             ErrorHandler.printError("The type of operands in assign is different");
         }
-        memory.add3AddressCode(Operation.ASSIGN, s1, s2);
+
+        codeFacade.generateAssignment(source, destination);
     }
 
     // Refactored arithmetic methods
@@ -907,7 +916,8 @@ public class CodeGenerator {
         Address jumpAddress = stackFacade.popAddress();
         Address condition = stackFacade.popAddress();
         Address loopStart = stackFacade.popAddress();
-        memory.add3AddressCode(jumpAddress.num, Operation.JPF, condition, new Address(memory.getCurrentCodeAddress() + 1, varType.Address), null);
+        memory.add3AddressCode(jumpAddress.num, Operation.JPF, condition,
+                new Address(memory.getCurrentCodeAddress() + 1, varType.Address), null);
         memory.add3AddressCode(Operation.JP, loopStart, null, null);
     }
 
@@ -916,21 +926,19 @@ public class CodeGenerator {
     }
 
     public void jpf_save() {
-        Address save = stackFacade.popAddress();
-        int currentAddress = memory.getCurrentCodeAddress();
-        memory.reserveCodeSlot();
-        memory.add3AddressCode(Operation.JPF, save, new Address(currentAddress, varType.Address));
-        stackFacade.pushCall(String.valueOf(currentAddress));
+        Address condition = stackFacade.popAddress();
+        int jumpAddress = codeFacade.generateConditionalJump(condition);
+        stackFacade.pushCall(String.valueOf(jumpAddress));
     }
 
     public void jpHere() {
-        int currentAddress = memory.getCurrentCodeAddress();
-        memory.reserveCodeSlot();
-        stackFacade.pushCall(String.valueOf(currentAddress));
+        int jumpAddress = codeFacade.generateUnconditionalJump();
+        stackFacade.pushCall(String.valueOf(jumpAddress));
     }
 
     public void print() {
-        memory.add3AddressCode(Operation.PRINT, stackFacade.popAddress(), null, null);
+        Address value = stackFacade.popAddress();
+        codeFacade.generatePrint(value);
     }
 
     // Refactored comparison methods
@@ -1020,8 +1028,13 @@ public class CodeGenerator {
         if (s.getVarType() != temp) {
             ErrorHandler.printError("The type of method and return address was not match");
         }
-        memory.add3AddressCode(Operation.ASSIGN, s, new Address(symbolTable.getMethodReturnAddress(stackFacade.peekSymbol(), methodName), varType.Address, TypeAddress.Indirect), null);
-        memory.add3AddressCode(Operation.JP, new Address(symbolTable.getMethodCallerAddress(stackFacade.peekSymbol(), methodName), varType.Address), null, null);
+        memory.add3AddressCode(Operation.ASSIGN, s,
+                new Address(symbolTable.getMethodReturnAddress(stackFacade.peekSymbol(), methodName), varType.Address,
+                        TypeAddress.Indirect),
+                null);
+        memory.add3AddressCode(Operation.JP,
+                new Address(symbolTable.getMethodCallerAddress(stackFacade.peekSymbol(), methodName), varType.Address),
+                null, null);
     }
 
     public void defParam() {
