@@ -635,3 +635,238 @@ public class CodeGenerator {
 
     // ... سایر متد ها مشابه قبل
 ```
+
+## بازآرایی ۷: جایگزینی شرطی با Polymorphism
+
+استفاده از یک دستور switch بزرگ در تابع semanticFunction مخالف اصل باز-بسته بودن است و افزودن اقدامات معنایی جدید را دشوار می‌کند. به‌کارگیری الگوی استراتژی با Polymorphism، امکان گسترش آسان اقدامات معنایی را فراهم می‌کند، نگه‌داری را بهبود می‌بخشد و اصول طراحی شی‌گرا را با پوشش‌دهی رفتارهای متغیر رعایت می‌کند.
+
+پیاده‌سازی:
+
+- **در گام اول، دایرکتوری semantic را اضافه می‌کنیم. سپس، با کلاس اول، یعنی SemanticAction شروع می‌کنیم. این کلاس به منظور تعریف یک واسط استراتژی برای اقدامات معنایی ایجاد شده است**
+
+```
+java:src/main/java/MiniJava/codeGenerator/semantic/SemanticAction.java
+```
+
+```Java
+package MiniJava.codeGenerator.semantic;
+
+import MiniJava.codeGenerator.*;
+import MiniJava.scanner.token.Token;
+import MiniJava.semantic.symbol.SymbolTable;
+
+public interface SemanticAction {
+    void execute(Token lookAhead, SemanticStackFacade stackFacade,
+            CodeGenerationFacade codeFacade, SymbolTable symbolTable);
+}
+```
+
+- **در گام دوم، اقدام به ایجاد کلاس SemanticActionFactory می‌کنیم. این کلاس به منظور ذخیره سازی یک کارخانه برای ایجاد نمونه‌های اقدامات تشکیل شده است.**
+
+```
+java:src/main/java/MiniJava/codeGenerator/semantic/SemanticActionFactory.java
+```
+
+```Java
+package MiniJava.codeGenerator.semantic;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class SemanticActionFactory {
+    private static final Map<Integer, SemanticAction> actions = new HashMap<>();
+
+    static {
+        actions.put(1, new CheckIdAction());
+        actions.put(2, new PidAction());
+        actions.put(3, new AddAction());
+        actions.put(4, new SubAction());
+        actions.put(5, new MultAction());
+        actions.put(6, new AssignAction());
+        actions.put(7, new LessThanAction());
+        actions.put(8, new EqualAction());
+        actions.put(9, new JpfSaveAction());
+        actions.put(10, new JpHereAction());
+        actions.put(11, new PrintAction());
+        actions.put(12, new DefClassAction());
+        actions.put(13, new DefMethodAction());
+        actions.put(14, new PClassAction());
+        actions.put(15, new DefVarAction());
+        actions.put(16, new MethodReturnAction());
+        actions.put(17, new PnumAction());
+        actions.put(18, new WhileLabelAction());
+        actions.put(19, new PtypeAction());
+        actions.put(20, new DefParamAction());
+        actions.put(21, new LastTypeBoolAction());
+        actions.put(22, new LastTypeIntAction());
+        actions.put(23, new DefMainAction());
+        actions.put(24, new DefVarMainAction());
+        actions.put(25, new MethodCallAction());
+        actions.put(26, new DefFieldAction());
+        actions.put(27, new DefVarFieldAction());
+        actions.put(28, new BeginAction());
+        actions.put(29, new CallAction());
+        actions.put(30, new RetAction());
+        actions.put(31, new AssignAction());
+        actions.put(32, new SpNumAction());
+        actions.put(33, new JpAction());
+        actions.put(34, new JpfAction());
+    }
+
+    public static SemanticAction getAction(int actionNumber) {
+        SemanticAction action = actions.get(actionNumber);
+        if (action == null) {
+            throw new IllegalArgumentException("Unknown semantic action: " + actionNumber);
+        }
+        return action;
+    }
+}
+```
+
+- **در گام سوم، کلاس CheckIdAction را ایجاد می‌کنیم که یک اقدام معنایی را پیاده‌سازی می‌کند که متغیر، متد و کلاس را از پشته معنایی دریافت می‌کند، نام آن‌ها را استخراج می‌کند و بررسی می‌کند که آیا متغیر مورد نظر با توجه به نام کلاس و متد در جدول نمادها تعریف شده است یا نه.**
+
+```
+java:src/main/java/MiniJava/codeGenerator/semantic/actions/CheckIdAction.java
+```
+
+```Java
+package MiniJava.codeGenerator.semantic.actions;
+
+import MiniJava.codeGenerator.*;
+import MiniJava.codeGenerator.semantic.SemanticAction;
+import MiniJava.scanner.token.Token;
+import MiniJava.semantic.symbol.SymbolTable;
+
+public class CheckIdAction implements SemanticAction {
+    @Override
+    public void execute(Token lookAhead, SemanticStackFacade stackFacade,
+                       CodeGenerationFacade codeFacade, SymbolTable symbolTable) {
+        String className = stackFacade.popSymbol();
+        String methodName = stackFacade.popSymbol();
+        String variableName = stackFacade.popSymbol();
+
+        if (symbolTable.lookupVariable(variableName, className, methodName) == null) {
+            ErrorHandler.printError("Variable '" + variableName + "' not declared");
+        }
+    }
+}
+```
+
+- **در گام چهارم، اقدام به ساخت یک کلاس دیگر برای یک اکشن دیگر می‌کنیم. کلاس AddAction به منظور این ساخته شده است که عملیات جمع (AddAction) را به عنوان یک اقدام معنایی پیاده‌سازی می‌کند.**
+
+```
+java:src/main/java/MiniJava/codeGenerator/semantic/actions/AddAction.java
+```
+
+```Java
+package MiniJava.codeGenerator.semantic.actions;
+
+import MiniJava.codeGenerator.*;
+import MiniJava.codeGenerator.semantic.SemanticAction;
+import MiniJava.scanner.token.Token;
+import MiniJava.semantic.symbol.SymbolTable;
+
+public class AddAction implements SemanticAction {
+    @Override
+    public void execute(Token lookAhead, SemanticStackFacade stackFacade,
+                       CodeGenerationFacade codeFacade, SymbolTable symbolTable) {
+        SemanticStackFacade.BinaryOperationContext context = stackFacade.popBinaryOperation();
+
+        // Type validation
+        if (context.getFirstOperand().getVarType() != varType.Int ||
+            context.getSecondOperand().getVarType() != varType.Int) {
+            ErrorHandler.printError("Type mismatch in addition operation");
+        }
+
+        Address result = codeFacade.generateArithmeticOperation(Operation.ADD,
+                                                              context.getFirstOperand(),
+                                                              context.getSecondOperand());
+        stackFacade.pushAddress(result);
+    }
+}
+```
+
+- **در گام پنجم، کلاس AssignAction نیز برای اکشن دیگری ساخته شده است. این کلاس، بدین منظور ایجاد شده است تا در اقدام معنایی assignment (AssignAction)، ابتدا operand مبدأ و مقصد از پشته معنایی برداشته می‌شوند. نوع داده دو operand بررسی می‌شود و در صورت اختلاف نوع، خطا گزارش می‌شود. در صورت یکی بودن نوع، assignment توسط Facade تولید کد انجام می‌شود.**
+
+```
+java:src/main/java/MiniJava/codeGenerator/semantic/actions/AssignAction.java
+```
+
+```Java
+package MiniJava.codeGenerator.semantic.actions;
+
+import MiniJava.codeGenerator.*;
+import MiniJava.codeGenerator.semantic.SemanticAction;
+import MiniJava.scanner.token.Token;
+import MiniJava.semantic.symbol.SymbolTable;
+
+public class AssignAction implements SemanticAction {
+    @Override
+    public void execute(Token lookAhead, SemanticStackFacade stackFacade,
+                       CodeGenerationFacade codeFacade, SymbolTable symbolTable) {
+        Address source = stackFacade.popAddress();
+        Address destination = stackFacade.popAddress();
+
+        // Type checking
+        if (source.getVarType() != destination.getVarType()) {
+            ErrorHandler.printError("The type of operands in assign is different");
+        }
+
+        codeFacade.generateAssignment(source, destination);
+    }
+}
+```
+
+- **در نهایت، در گام آخر، در فایل CodeGenerator.java، نیاز است تا متد هایی که مشمول تغییر شده اند را در این بخش نیز تغییر دهیم. توجه داشته باشید که در گام اول، همان متد semanticFunction را باید تغییر دهیم که تمام عملیات به خاطر طولانی بودن آن بوده است. توابع دیگری همچون checkID، pid و add نیز تغییر جزئی خواهند داشت:**
+
+```
+
+```
+
+```Java
+//سایر کد مشابه قبل است...
+import MiniJava.codeGenerator.semantic.SemanticActionFactory;
+
+public class CodeGenerator {
+    private SemanticStackFacade stackFacade;
+    private CodeGenerationFacade codeFacade;
+    private Scanner scanner;
+    private SymbolTable symbolTable;
+
+    public CodeGenerator() {
+        this.stackFacade = new SemanticStackFacade();
+        Memory memory = new Memory();
+        this.codeFacade = new CodeGenerationFacade(memory);
+        this.scanner = new Scanner(System.in);
+        this.symbolTable = new SymbolTable(memory);
+    }
+
+    public void semanticFunction(int func, Token next) {
+        try {
+            SemanticAction action = SemanticActionFactory.getAction(func);
+            action.execute(next, stackFacade, codeFacade, symbolTable);
+        } catch (IllegalArgumentException e) {
+            ErrorHandler.printError("Unknown semantic action: " + func);
+        } catch (Exception e) {
+            ErrorHandler.printError("Error executing semantic action " + func + ": " + e.getMessage());
+        }
+    }
+
+    @Deprecated
+    public void checkID() {
+        SemanticActionFactory.getAction(1).execute(null, stackFacade, codeFacade, symbolTable);
+    }
+
+    @Deprecated
+    public void pid(Token next) {
+        SemanticActionFactory.getAction(2).execute(next, stackFacade, codeFacade, symbolTable);
+    }
+
+    @Deprecated
+    public void add() {
+        SemanticActionFactory.getAction(3).execute(null, stackFacade, codeFacade, symbolTable);
+    }
+
+    //سایر کد مشابه قبل است...
+}
+```

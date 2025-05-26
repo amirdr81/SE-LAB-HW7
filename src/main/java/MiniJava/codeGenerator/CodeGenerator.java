@@ -591,6 +591,8 @@
 package MiniJava.codeGenerator;
 
 import MiniJava.Log.Log;
+import MiniJava.codeGenerator.semantic.SemanticAction;
+import MiniJava.codeGenerator.semantic.SemanticActionFactory;
 import MiniJava.errorHandler.ErrorHandler;
 import MiniJava.scanner.token.Token;
 import MiniJava.semantic.symbol.Symbol;
@@ -658,109 +660,13 @@ public class CodeGenerator {
     }
 
     public void semanticFunction(int func, Token next) {
-        Log.print("codegenerator : " + func);
-        switch (func) {
-            case 0:
-                return;
-            case 1:
-                checkID();
-                break;
-            case 2:
-                pid(next);
-                break;
-            case 3:
-                fpid();
-                break;
-            case 4:
-                kpid(next);
-                break;
-            case 5:
-                intpid(next);
-                break;
-            case 6:
-                startCall();
-                break;
-            case 7:
-                call();
-                break;
-            case 8:
-                arg();
-                break;
-            case 9:
-                assign();
-                break;
-            case 10:
-                add();
-                break;
-            case 11:
-                sub();
-                break;
-            case 12:
-                mult();
-                break;
-            case 13:
-                label();
-                break;
-            case 14:
-                save();
-                break;
-            case 15:
-                whileLabel();
-                break;
-            case 16:
-                jpf_save();
-                break;
-            case 17:
-                jpHere();
-                break;
-            case 18:
-                print();
-                break;
-            case 19:
-                equal();
-                break;
-            case 20:
-                less_than();
-                break;
-            case 21:
-                and();
-                break;
-            case 22:
-                not();
-                break;
-            case 23:
-                defClass();
-                break;
-            case 24:
-                defMethod();
-                break;
-            case 25:
-                popClass();
-                break;
-            case 26:
-                extend();
-                break;
-            case 27:
-                defField();
-                break;
-            case 28:
-                defVar();
-                break;
-            case 29:
-                methodReturn();
-                break;
-            case 30:
-                defParam();
-                break;
-            case 31:
-                lastTypeBool();
-                break;
-            case 32:
-                lastTypeInt();
-                break;
-            case 33:
-                defMain();
-                break;
+        try {
+            SemanticAction action = SemanticActionFactory.getAction(func);
+            action.execute(next, stackFacade, codeFacade, symbolTable);
+        } catch (IllegalArgumentException e) {
+            ErrorHandler.printError("Unknown semantic action: " + func);
+        } catch (Exception e) {
+            ErrorHandler.printError("Error executing semantic action " + func + ": " + e.getMessage());
         }
     }
 
@@ -776,15 +682,14 @@ public class CodeGenerator {
         stackFacade.pushSymbol(methodName);
     }
 
+    @Deprecated
     public void checkID() {
-        stackFacade.popSymbol();
-        if (stackFacade.peekAddress().getVarType() == varType.Non) {
-            // TODO : error
-        }
+        SemanticActionFactory.getAction(1).execute(null, stackFacade, codeFacade, symbolTable);
     }
 
+    @Deprecated
     public void pid(Token next) {
-        stackFacade.pushSymbol(next.value);
+        SemanticActionFactory.getAction(2).execute(next, stackFacade, codeFacade, symbolTable);
     }
 
     public void pClass() {
@@ -892,8 +797,9 @@ public class CodeGenerator {
     }
 
     // Refactored arithmetic methods
+    @Deprecated
     public void add() {
-        performBinaryArithmeticOperation(Operation.ADD, "addition");
+        SemanticActionFactory.getAction(3).execute(null, stackFacade, codeFacade, symbolTable);
     }
 
     public void sub() {
