@@ -486,3 +486,152 @@ public class CodeGenerator {
 }
 
 ```
+
+## بازآرایی ۶: الگوی نما (Facade Pattern) برای مدیریت حافظه
+
+در کد پروژه، ایجاد وابستگی‌های پیچیده در اثر تعامل مستقیم میان چندین کلاس (مانند Memory، Address، و \_3AddressCode) رخ داده است. یک Facade مدیریت حافظه، واسطی تمیز برای عملیات تولید کد فراهم می‌کند، پیچیدگی را پنهان می‌سازد و عملیات سطح بالایی ارائه می‌دهد که هدف مشخص شده در ابتدای پروژه را به‌روشنی بیان می‌کند.
+
+در فایل:
+
+```
+java:src/main/java/MiniJava/codeGenerator/CodeGenerationFacade.java
+```
+
+بدین منظور، کلاس CodeGenerationFacade را اضافه می‌کنیم تا متد های بیان شده را generate کرده و وابستگی را کاهش دهد.
+
+```Java
+package MiniJava.codeGenerator;
+
+public class CodeGenerationFacade {
+    private Memory memory;
+
+    public CodeGenerationFacade(Memory memory) {
+        this.memory = memory;
+    }
+
+    public Address generateArithmeticOperation(Operation operation, Address operand1, Address operand2) {
+        Address result = new Address(memory.getTemp(), varType.Int);
+        memory.add3AddressCode(operation, operand1, operand2, result);
+        return result;
+    }
+
+    public Address generateComparisonOperation(Operation operation, Address operand1, Address operand2) {
+        Address result = new Address(memory.getTemp(), varType.Bool);
+        memory.add3AddressCode(operation, operand1, operand2, result);
+        return result;
+    }
+
+    public void generateAssignment(Address source, Address destination) {
+        memory.add3AddressCode(Operation.ASSIGN, source, destination);
+    }
+
+    public int generateConditionalJump(Address condition) {
+        int jumpAddress = memory.getCurrentCodeAddress();
+        memory.reserveCodeSlot();
+        memory.add3AddressCode(Operation.JPF, condition, new Address(jumpAddress, varType.Address));
+        return jumpAddress;
+    }
+
+    public int generateUnconditionalJump() {
+        int jumpAddress = memory.getCurrentCodeAddress();
+        memory.reserveCodeSlot();
+        memory.add3AddressCode(Operation.JP, new Address(jumpAddress, varType.Address));
+        return jumpAddress;
+    }
+
+    public void updateJumpTarget(int jumpInstructionAddress, int targetAddress) {
+        memory.add3AddressCode(jumpInstructionAddress, Operation.JP,
+                new Address(targetAddress, varType.Address), null, null);
+    }
+
+    public void generatePrint(Address value) {
+        memory.add3AddressCode(Operation.PRINT, value);
+    }
+
+    public Address createTempAddress(varType type) {
+        return new Address(memory.getTemp(), type);
+    }
+
+    public Address createDataAddress(varType type) {
+        return new Address(memory.getDateAddress(), type);
+    }
+
+    public int getCurrentCodeAddress() {
+        return memory.getCurrentCodeAddress();
+    }
+
+    public void printGeneratedCode() {
+        memory.pintCodeBlock();
+    }
+}
+```
+
+و همچنین در فایل
+
+```
+java:src/main/java/MiniJava/codeGenerator/CodeGeneration.java
+```
+
+نیز، تمامی توابعی که در این تغییر مشمول هستند را آپدیت می‌کنیم:
+
+```Java
+// ... سایر متد ها مشابه قبل
+
+public class CodeGenerator {
+    private SemanticStackFacade stackFacade;
+    private CodeGenerationFacade codeFacade;
+    private Scanner scanner;
+    private SymbolTable symbolTable;
+
+    public CodeGenerator() {
+        this.stackFacade = new SemanticStackFacade();
+        Memory memory = new Memory();
+        this.codeFacade = new CodeGenerationFacade(memory);
+        this.scanner = new Scanner(System.in);
+        this.symbolTable = new SymbolTable(memory);
+    }
+
+    private void performBinaryArithmeticOperation(Operation operation, String operationName) {
+        SemanticStackFacade.BinaryOperationContext context = stackFacade.popBinaryOperation();
+        validateIntegerOperands(context.getFirstOperand(), context.getSecondOperand(), operationName);
+        Address result = codeFacade.generateArithmeticOperation(operation,
+            context.getFirstOperand(),
+            context.getSecondOperand());
+        stackFacade.pushAddress(result);
+    }
+
+    private void performBinaryComparisonOperation(Operation operation, String operationName) {
+        SemanticStackFacade.BinaryOperationContext context = stackFacade.popBinaryOperation();
+        validateIntegerOperands(context.getFirstOperand(), context.getSecondOperand(), operationName);
+        Address result = codeFacade.generateComparisonOperation(operation,
+            context.getFirstOperand(),
+            context.getSecondOperand());
+        stackFacade.pushAddress(result);
+    }
+
+    public void assign() {
+        Address source = stackFacade.popAddress();
+        Address destination = stackFacade.popAddress();
+        if (source.getVarType() != destination.getVarType())
+            ErrorHandler.printError("The type of operands in assign is different");
+        codeFacade.generateAssignment(source, destination);
+    }
+
+    public void jpf_save() {
+        Address condition = stackFacade.popAddress();
+        int jumpAddress = codeFacade.generateConditionalJump(condition);
+        stackFacade.pushCall(String.valueOf(jumpAddress));
+    }
+
+    public void jpHere() {
+        int jumpAddress = codeFacade.generateUnconditionalJump();
+        stackFacade.pushCall(String.valueOf(jumpAddress));
+    }
+
+    public void print() {
+        Address value = stackFacade.popAddress();
+        codeFacade.generatePrint(value);
+    }
+
+    // ... سایر متد ها مشابه قبل
+```
